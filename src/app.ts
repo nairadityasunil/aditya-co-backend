@@ -73,6 +73,8 @@ class App {
         max: 300,
         standardHeaders: true,
         legacyHeaders: false,
+        // The analytics collector has its own, per-minute limiter.
+        skip: (req) => req.path === '/api/public/analytics/collect',
       })
     );
 

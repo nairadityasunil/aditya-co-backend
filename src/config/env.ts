@@ -38,6 +38,16 @@ const config = {
     apiSecret: process.env.CLOUDINARY_API_SECRET || '',
     folder: process.env.CLOUDINARY_FOLDER || 'aditya_co',
   },
+  // The production website whose analytics the CMS shows by default.
+  analytics: {
+    siteHost: (process.env.ANALYTICS_SITE_HOST || 'adityaco.co.in').replace(/^www\./, ''),
+  },
+  // Upload limits enforced by the media module (sign + finalize steps).
+  media: {
+    imageMaxBytes: Number(process.env.MEDIA_IMAGE_MAX_MB || 10) * 1024 * 1024,
+    videoMaxBytes: Number(process.env.MEDIA_VIDEO_MAX_MB || 100) * 1024 * 1024,
+    videoMaxSeconds: Number(process.env.MEDIA_VIDEO_MAX_SECONDS || 180),
+  },
   seedAdmin: {
     username: process.env.ADMIN_USERNAME || 'admin',
     password: process.env.ADMIN_PASSWORD || 'admin',

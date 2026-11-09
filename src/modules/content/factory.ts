@@ -13,11 +13,15 @@ export interface CrudOptions {
   label: string;
   model: Model<any>;
   schema: ObjectSchema;
+  /** Optional explicit PATCH schema (defaults to the create schema with every key optional) */
+  updateSchema?: ObjectSchema;
   searchFields: string[];
   /** Optional hook to derive fields (e.g. slug) before writing */
   prepare?: (data: Record<string, any>, isCreate: boolean) => Record<string, any>;
   /** Public listing filter (default: published only) */
   publicFilter?: Record<string, unknown>;
+  /** Field the public list can be filtered by with ?<field>=value, and whose distinct values are returned in meta.facets */
+  facetField?: string;
 }
 
 const reorderBody = (body: any): Array<{ id: string; displayOrder: number }> => {
@@ -35,17 +39,35 @@ const reorderBody = (body: any): Array<{ id: string; displayOrder: number }> => 
  * Same endpoint shape as the portfolio CMS: { data, meta } responses, /api/admin/* guarded by JWT.
  */
 export function buildCrudRoutes(opts: CrudOptions): Routes {
-  const { path, label, model, schema, searchFields, prepare, publicFilter = { isPublished: true } } = opts;
+  const { path, label, model, schema, searchFields, prepare, publicFilter = { isPublished: true }, facetField } = opts;
   const router = Router();
   const base = '/api';
-  const updateSchema = schema.fork(Object.keys(schema.describe().keys ?? {}), (s) => s.optional());
+  const updateSchema = opts.updateSchema ?? schema.fork(Object.keys(schema.describe().keys ?? {}), (s) => s.optional());
   const guard = [requireAuth, requireAdmin];
 
-  router.get(`${base}/public/${path}`, async (_req: Request, res: Response, next: NextFunction) => {
+  router.get(`${base}/public/${path}`, async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const data = await model.find(publicFilter).sort({ displayOrder: 1, createdAt: -1 }).lean();
+      const sort = { displayOrder: 1, createdAt: -1, _id: 1 } as const;
       res.set('Cache-Control', 'public, max-age=60');
-      res.status(200).json({ data });
+
+      // Without page/limit the full list is returned (existing behaviour).
+      if (req.query.page === undefined && req.query.limit === undefined) {
+        res.status(200).json({ data: await model.find(publicFilter).sort(sort).lean() });
+        return;
+      }
+
+      const page = Math.max(parseInt(String(req.query.page ?? '1'), 10) || 1, 1);
+      const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '20'), 10) || 20, 1), 50);
+      const filter: Record<string, unknown> = { ...publicFilter };
+      const facet = facetField && typeof req.query[facetField] === 'string' ? String(req.query[facetField]).trim() : '';
+      if (facetField && facet && facet !== 'All') filter[facetField] = facet;
+
+      const [data, total, facets] = await Promise.all([
+        model.find(filter).sort(sort).skip((page - 1) * limit).limit(limit).lean(),
+        model.countDocuments(filter),
+        facetField ? model.distinct(facetField, publicFilter) : Promise.resolve([]),
+      ]);
+      res.status(200).json({ data, meta: { total, page, limit, pages: Math.max(Math.ceil(total / limit), 1), facets: (facets as string[]).filter(Boolean).sort() } });
     } catch (e) {
       next(e);
     }
