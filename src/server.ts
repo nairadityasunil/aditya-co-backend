@@ -10,6 +10,7 @@ import ChatbotRoutes from './modules/chatbot/routes';
 import MediaRoutes from './modules/media/routes';
 import PageRoutes from './modules/pages/routes';
 import PreviewRoutes from './modules/preview/routes';
+import { logMailConfig } from './services/mailer.service';
 import { contentRoutes } from './modules/content/routes';
 
 const app = new App([
@@ -26,6 +27,8 @@ const app = new App([
   new PreviewRoutes(),
   ...contentRoutes(),
 ]);
+
+logMailConfig();
 
 app.listen().catch((err) => {
   console.error('Failed to start server:', err);
