@@ -18,27 +18,32 @@ export interface DefaultTemplate {
   variables: TemplateVariable[];
 }
 
-const wrap = (title: string, inner: string) => `<!doctype html>
+const wrap = (title: string, inner: string, preheader = '') => `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
 <title>${title}</title>
 </head>
-<body style="margin:0;padding:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;color:#0a0f1c;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7fb;padding:24px 12px;">
+<body style="margin:0;padding:0;background:#eef1f7;font-family:Arial,Helvetica,sans-serif;color:#0a0f1c;-webkit-text-size-adjust:100%;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;font-size:1px;line-height:1px;">${preheader}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f7;padding:32px 12px;">
     <tr><td align="center">
-      <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
-        <tr><td style="background:#0a0f1c;padding:20px 28px;">
-          <span style="font-size:18px;font-weight:bold;color:#ffffff;">{{companyName}}</span>
-          <span style="display:block;height:3px;width:40px;background:#f12024;margin-top:10px;"></span>
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #dfe5ef;">
+        <tr><td align="center" style="background:#0a0f1c;padding:30px 28px 24px;">
+          <img src="{{logoUrl}}" alt="{{companyName}}" width="110" style="display:block;margin:0 auto 14px;border:0;outline:none;height:auto;max-width:110px;">
+          <span style="display:block;font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:#a9b6d3;">{{companyName}}</span>
         </td></tr>
-        <tr><td style="padding:28px;">
-          <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">${title}</h1>
+        <tr><td style="height:4px;line-height:4px;font-size:0;background:#f12024;">&nbsp;</td></tr>
+        <tr><td style="padding:34px 36px 30px;">
+          <h1 style="margin:0 0 6px;font-size:24px;line-height:1.3;color:#0a0f1c;">${title}</h1>
 ${inner}
         </td></tr>
-        <tr><td style="padding:16px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;">
-          {{companyName}} &middot; Gandhidham, Gujarat, India
+        <tr><td align="center" style="padding:22px 28px;background:#0f172a;">
+          <p style="margin:0 0 4px;font-size:13px;font-weight:bold;color:#ffffff;">{{companyName}}</p>
+          <p style="margin:0 0 10px;font-size:12px;line-height:1.6;color:#94a3b8;">Gandhidham, Gujarat, India &middot; Shipping, logistics &amp; software</p>
+          <a href="{{websiteUrl}}" style="font-size:12px;color:#ff6b6e;text-decoration:none;">{{websiteUrl}}</a>
         </td></tr>
       </table>
     </td></tr>
@@ -46,12 +51,13 @@ ${inner}
 </body>
 </html>`;
 
-const label = 'padding:8px 0;width:110px;vertical-align:top;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#64748b;';
 const box = 'padding:16px;background:#f5f7fb;border-radius:12px;font-size:15px;line-height:1.6;white-space:pre-wrap;';
 
 const common: TemplateVariable[] = [
   { key: 'companyName', description: 'Company name', sample: 'Aditya & Co.' },
   { key: 'websiteUrl', description: 'Public website address', sample: 'https://adityaco.co.in' },
+  { key: 'logoUrl', description: 'Company logo image (must be a public https address)', sample: 'https://res.cloudinary.com/drd6hssz1/image/upload/f_png,w_240/v1775758145/aditya_logo_i0lvpo.png' },
+  { key: 'adminUrl', description: 'Link to Enquiries in the CMS', sample: 'https://adityaco.co.in/admin/enquiries' },
 ];
 const enquiry: TemplateVariable[] = [
   { key: 'name', description: "Visitor's full name", sample: 'Rahul Sharma' },
@@ -71,16 +77,28 @@ export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
     subject: 'New enquiry: {{service}} from {{name}}',
     variables: [...enquiry, ...common],
     html: wrap(
-      'New enquiry',
-      `          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-            <tr><td style="${label}">Name</td><td style="padding:8px 0;font-size:15px;">{{name}}</td></tr>
-            <tr><td style="${label}">Email</td><td style="padding:8px 0;font-size:15px;"><a href="mailto:{{email}}" style="color:#3f5fe0;">{{email}}</a></td></tr>
-            <tr><td style="${label}">Phone</td><td style="padding:8px 0;font-size:15px;">{{phone}}</td></tr>
-            <tr><td style="${label}">Service</td><td style="padding:8px 0;font-size:15px;">{{service}}</td></tr>
-            <tr><td style="${label}">Via</td><td style="padding:8px 0;font-size:15px;">{{via}}</td></tr>
+      'New enquiry from {{name}}',
+      `          <p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#475569;">Someone just got in touch through the <strong style="color:#0a0f1c;">{{via}}</strong> about <strong style="color:#0a0f1c;">{{service}}</strong>.</p>
+
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;">
+            <tr><td style="padding:14px 18px;width:96px;vertical-align:middle;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;border-bottom:1px solid #e2e8f0;">Name</td><td style="padding:14px 18px 14px 0;font-size:15px;font-weight:bold;color:#0a0f1c;border-bottom:1px solid #e2e8f0;">{{name}}</td></tr>
+            <tr><td style="padding:14px 18px;vertical-align:middle;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;border-bottom:1px solid #e2e8f0;">Email</td><td style="padding:14px 18px 14px 0;font-size:15px;border-bottom:1px solid #e2e8f0;"><a href="mailto:{{email}}" style="color:#3f5fe0;text-decoration:none;">{{email}}</a></td></tr>
+            <tr><td style="padding:14px 18px;vertical-align:middle;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;border-bottom:1px solid #e2e8f0;">Phone</td><td style="padding:14px 18px 14px 0;font-size:15px;color:#0a0f1c;border-bottom:1px solid #e2e8f0;">{{phone}}</td></tr>
+            <tr><td style="padding:14px 18px;vertical-align:middle;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;">Service</td><td style="padding:14px 18px 14px 0;font-size:15px;color:#0a0f1c;">{{service}}</td></tr>
           </table>
-          <div style="margin-top:16px;${box}">{{message}}</div>
-          <p style="margin:20px 0 0;font-size:13px;color:#64748b;">Press Reply to answer {{name}} directly. It is also saved in the CMS under Enquiries.</p>`
+
+          <p style="margin:26px 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;">Their message</p>
+          <div style="padding:18px 20px;background:#fff7f7;border-left:4px solid #f12024;border-radius:0 12px 12px 0;font-size:15px;line-height:1.7;color:#0a0f1c;white-space:pre-wrap;">{{message}}</div>
+
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0 0;">
+            <tr>
+              <td style="border-radius:10px;background:#f12024;"><a href="mailto:{{email}}?subject=Re%3A%20your%20enquiry" style="display:inline-block;padding:13px 24px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:10px;">Reply to {{name}}</a></td>
+              <td style="width:12px;">&nbsp;</td>
+              <td style="border-radius:10px;border:1px solid #cbd5e1;"><a href="{{adminUrl}}" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:bold;color:#0a0f1c;text-decoration:none;border-radius:10px;">Open in CMS</a></td>
+            </tr>
+          </table>
+          <p style="margin:18px 0 0;font-size:13px;line-height:1.6;color:#64748b;">You can also just press Reply on this email to answer {{name}} directly. It is saved in the CMS under Enquiries.</p>`,
+      'New enquiry from {{name}} about {{service}}'
     ),
   },
   {

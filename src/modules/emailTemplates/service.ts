@@ -22,10 +22,13 @@ export const renderString = (template: string, vars: Record<string, string>, esc
 export const sampleVars = (variables: TemplateVariable[]): Record<string, string> =>
   Object.fromEntries(variables.map((v) => [v.key, v.sample ?? '']));
 
-export const baseVars = (): Record<string, string> => ({
-  companyName: 'Aditya & Co.',
-  websiteUrl: (config.cors.frontendBaseUrl || '').replace(/\/$/, ''),
-});
+/** The company logo as a public https image (email clients cannot load files from the server). Override with MAIL_LOGO_URL. */
+const LOGO_URL = process.env.MAIL_LOGO_URL?.trim() || 'https://res.cloudinary.com/drd6hssz1/image/upload/f_png,w_240/v1775758145/aditya_logo_i0lvpo.png';
+
+export const baseVars = (): Record<string, string> => {
+  const websiteUrl = (config.cors.frontendBaseUrl || '').replace(/\/$/, '');
+  return { companyName: 'Aditya & Co.', websiteUrl, logoUrl: LOGO_URL, adminUrl: `${websiteUrl}/admin/enquiries` };
+};
 
 /** Inserts any default template missing from the database. Never overwrites an edited one. */
 export const ensureDefaultTemplates = async (): Promise<void> => {
