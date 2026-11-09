@@ -51,7 +51,6 @@ ${inner}
 </body>
 </html>`;
 
-const box = 'padding:16px;background:#f5f7fb;border-radius:12px;font-size:15px;line-height:1.6;white-space:pre-wrap;';
 
 const common: TemplateVariable[] = [
   { key: 'companyName', description: 'Company name', sample: 'Aditya & Co.' },
@@ -109,10 +108,38 @@ export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
     variables: [...enquiry, ...common],
     html: wrap(
       'Thank you, {{firstName}}',
-      `          <p style="margin:0 0 14px;font-size:15px;line-height:1.6;">We have received your enquiry about <strong>{{service}}</strong> and our team will get back to you shortly.</p>
-          <p style="margin:0 0 6px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#64748b;">Your message</p>
-          <div style="${box}">{{message}}</div>
-          <p style="margin:20px 0 0;font-size:13px;color:#64748b;">If it is urgent, you can also call or message us on WhatsApp. Please do not reply with sensitive information.</p>`
+      `          <p style="margin:0 0 22px;font-size:16px;line-height:1.65;color:#475569;">We have received your enquiry about <strong style="color:#0a0f1c;">{{service}}</strong>. Our team is on it and will get back to you shortly.</p>
+
+          <p style="margin:0 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;">Your message</p>
+          <div style="padding:16px 18px;background:#fff7f7;border-left:4px solid #f12024;border-radius:0 12px 12px 0;font-size:15px;line-height:1.7;color:#0a0f1c;white-space:pre-wrap;">{{message}}</div>
+
+          <p style="margin:30px 0 12px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;">What happens next</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="width:34px;vertical-align:top;padding:0 0 14px;"><div style="width:26px;height:26px;line-height:26px;text-align:center;border-radius:13px;background:#0a0f1c;color:#ffffff;font-size:13px;font-weight:bold;">1</div></td>
+              <td style="padding:2px 0 14px;font-size:14px;line-height:1.55;color:#0a0f1c;"><strong>We review your enquiry</strong><br><span style="color:#64748b;">The right person on our team picks it up.</span></td>
+            </tr>
+            <tr>
+              <td style="width:34px;vertical-align:top;padding:0 0 14px;"><div style="width:26px;height:26px;line-height:26px;text-align:center;border-radius:13px;background:#0a0f1c;color:#ffffff;font-size:13px;font-weight:bold;">2</div></td>
+              <td style="padding:2px 0 14px;font-size:14px;line-height:1.55;color:#0a0f1c;"><strong>We get in touch with you</strong><br><span style="color:#64748b;">By email, or by phone if you shared a number.</span></td>
+            </tr>
+            <tr>
+              <td style="width:34px;vertical-align:top;padding:0;"><div style="width:26px;height:26px;line-height:26px;text-align:center;border-radius:13px;background:#0a0f1c;color:#ffffff;font-size:13px;font-weight:bold;">3</div></td>
+              <td style="padding:2px 0 0;font-size:14px;line-height:1.55;color:#0a0f1c;"><strong>We agree the next steps together</strong><br><span style="color:#64748b;">A clear plan and quote for what you need.</span></td>
+            </tr>
+          </table>
+
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:30px 0 0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;">
+            <tr><td style="padding:18px 20px;font-size:14px;line-height:1.8;color:#0a0f1c;">
+              <strong>In a hurry? Reach us directly.</strong><br>
+              Call <a href="tel:+919825295685" style="color:#d91b22;text-decoration:none;font-weight:bold;">+91 98252 95685</a>
+              or WhatsApp <a href="https://wa.me/919427395685" style="color:#d91b22;text-decoration:none;font-weight:bold;">+91 94273 95685</a><br>
+              Email <a href="mailto:info@adityaco.co.in" style="color:#d91b22;text-decoration:none;font-weight:bold;">info@adityaco.co.in</a>
+              or <a href="mailto:adityakdl@gmail.com" style="color:#d91b22;text-decoration:none;font-weight:bold;">adityakdl@gmail.com</a>
+            </td></tr>
+          </table>
+          <p style="margin:18px 0 0;font-size:12px;line-height:1.6;color:#94a3b8;">Please do not reply with sensitive information such as bank or card details.</p>`,
+      'We have received your enquiry about {{service}}'
     ),
   },
   {
