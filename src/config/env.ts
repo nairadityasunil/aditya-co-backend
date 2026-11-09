@@ -38,6 +38,22 @@ const config = {
     apiSecret: process.env.CLOUDINARY_API_SECRET || '',
     folder: process.env.CLOUDINARY_FOLDER || 'aditya_co',
   },
+  // Email for enquiries (Nodemailer). See services/mailer.service.ts for the Render free-plan notes.
+  mail: {
+    brevoApiKey: process.env.BREVO_API_KEY || '',
+    smtp: {
+      /** A Nodemailer "well-known service" such as gmail, as a shortcut for host, port and TLS */
+      service: process.env.SMTP_SERVICE || '',
+      host: process.env.SMTP_HOST || '',
+      port: Number(process.env.SMTP_PORT || 587),
+      // port 465 is always TLS from the first byte; Nodemailer hangs if that flag is forgotten
+      secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : Number(process.env.SMTP_PORT || 587) === 465,
+      user: process.env.SMTP_USER || '',
+      pass: process.env.SMTP_PASS || '',
+    },
+    from: process.env.MAIL_FROM || '',
+    to: (process.env.MAIL_TO || '').split(',').map((s) => s.trim()).filter(Boolean),
+  },
   // The production website whose analytics the CMS shows by default.
   analytics: {
     siteHost: (process.env.ANALYTICS_SITE_HOST || 'adityaco.co.in').replace(/^www\./, ''),

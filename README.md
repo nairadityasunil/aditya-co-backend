@@ -77,3 +77,34 @@ Reports default to the live site (`ANALYTICS_SITE_HOST`, default `adityaco.co.in
 - `GET /api/public/gallery?page=1&limit=20&category=Port` returns one page plus `meta: { total, page, pages, facets }` (`facets` = the categories for the filter buttons). Without `page`/`limit` it still returns the full list.
 - Gallery items store `width`/`height` so the site can size tiles (masonry) before images load.
 - A video's thumbnail is a random frame (between 8% and 92% of its length) chosen when it is uploaded. `POST /api/admin/media/thumbnail { publicId }` picks another one. The video file itself is only requested by the browser when a visitor opens it.
+
+## Website chatbot
+
+A simple guided assistant on the public site (no AI): visitors press buttons for common questions, and it can collect their details step by step and send them as an enquiry (saved in the CMS Enquiries inbox with source "chatbot", and emailed like the contact form). The menu and wording are edited under **Chatbot** in the CMS.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/api/public/chatbot` | The widget's menu: name, greeting, topics, enquiry wording |
+| GET/PATCH | `/api/admin/chatbot` | Edit the menu and wording (plus the built-in defaults for "reset") |
+
+Each topic is a menu button that either shows an answer, starts the enquiry form, or shows contact buttons. Answers can use placeholders filled in from the live CMS content: `{shippingServices}`, `{softwareServices}`, `{products}`, `{phone}`, `{whatsapp}`, `{email}`, `{address}`. Button presses are recorded as analytics events (`chat_button`), and finished enquiries count as `enquiry_submit`.
+
+## Email for enquiries (plain Nodemailer over SMTP)
+
+Every enquiry (contact form or chatbot) is saved first, then emailed in the background with Nodemailer: one email to the team (Reply goes straight to the visitor) and a confirmation to the visitor. The outcome is stored on each enquiry and shown in the CMS under **Enquiries**, which also has a **Send test email** button.
+
+No third-party sending service is needed, any mailbox with SMTP access works. Set these in the backend environment:
+
+| Variable | Purpose |
+| --- | --- |
+| `SMTP_HOST`, `SMTP_PORT` | Your mail server, e.g. `smtp.yourdomain.com` and `587`. Port 465 is treated as TLS automatically |
+| `SMTP_SERVICE` | Shortcut instead of host/port for well-known providers, e.g. `gmail` |
+| `SMTP_USER`, `SMTP_PASS` | The mailbox login. For Gmail use an **App Password** (Google Account > Security > 2-Step Verification > App passwords), not your normal password |
+| `MAIL_FROM` | Optional sender, e.g. `Aditya & Co. <info@yourdomain.com>`. Defaults to `SMTP_USER` (Gmail only sends as the logged-in address) |
+| `MAIL_TO` | Optional recipients of the new-enquiry email, comma separated. Defaults to the emails under Contact details in the CMS |
+
+Gmail example: `SMTP_SERVICE=gmail`, `SMTP_USER=you@gmail.com`, `SMTP_PASS=<app password>`.
+
+**Render's free plan blocks outbound SMTP on ports 25, 465 and 587**, so these logins time out there (it works locally and on a paid Render plan). On the free plan you can either use a mail server that listens on another port (many offer 2525, but Gmail does not), or switch on the optional HTTPS fallback by setting `BREVO_API_KEY` (a free Brevo account, same Nodemailer code, delivered over port 443). The CMS Enquiries page tells you if your current settings will hit this.
+
+Until email is configured the website keeps using EmailJS as before (the server tells the site whether it sent the email, so nobody gets duplicates).

@@ -5,6 +5,7 @@ import SettingsRoutes from './modules/settings/routes';
 import EnquiryRoutes from './modules/enquiries/routes';
 import PublicRoutes from './modules/public/routes';
 import AnalyticsRoutes from './modules/analytics/routes';
+import ChatbotRoutes from './modules/chatbot/routes';
 import MediaRoutes from './modules/media/routes';
 import PageRoutes from './modules/pages/routes';
 import PreviewRoutes from './modules/preview/routes';
@@ -15,6 +16,7 @@ const app = new App([
   new UploadRoutes(),
   new MediaRoutes(),
   new AnalyticsRoutes(),
+  new ChatbotRoutes(),
   new SettingsRoutes(),
   new EnquiryRoutes(),
   new PublicRoutes(),
