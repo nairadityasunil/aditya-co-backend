@@ -61,7 +61,7 @@ async function emailEnquiry(id: string, data: Record<string, any>): Promise<void
   try {
     const mail = await build('ENQUIRY_THANK_YOU', enquiryVars(data as any), () => visitorConfirmation(data as any));
     if (mail) {
-      await sendMail({ to: data.email, subject: mail.subject, html: mail.html, text: mail.text });
+      await sendMail({ to: data.email, subject: mail.subject, html: mail.html, text: mail.text, replyTo: config.mail.replyTo || undefined });
       visitor = 'sent';
     } else {
       logger.warn(`[enquiry] ${id}: visitor thank-you skipped because the ENQUIRY_THANK_YOU template is switched off in the CMS`);
@@ -178,8 +178,8 @@ class EnquiryRoutes implements Routes {
         const sentBy = user?.name || user?.email || '';
         const mail = (await build('ENQUIRY_REPLY', enquiryVars(doc.toObject() as any, { reply: req.body.message, sentBy: sentBy || 'Aditya & Co.' }), () => replyToVisitor(doc.toObject() as any, req.body.message, sentBy), { ignoreActive: true }))!;
         try {
-          // The visitor's answer goes to the firm's own inbox.
-          await sendMail({ to: doc.email, subject: mail.subject, html: mail.html, text: mail.text, replyTo: (await recipients())[0] });
+          // No Reply-To unless MAIL_REPLY_TO is set: the visitor's answer goes to the From address, never a team member's personal inbox.
+          await sendMail({ to: doc.email, subject: mail.subject, html: mail.html, text: mail.text, replyTo: config.mail.replyTo || undefined });
         } catch (e) {
           throw new AppError(502, `The reply could not be sent: ${(e as Error).message}`, 'MAIL_FAILED');
         }
