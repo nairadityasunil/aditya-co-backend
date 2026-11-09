@@ -6,6 +6,7 @@ import { requireAdmin, requireAuth } from '../../middleware/auth.middleware';
 import { validateBody } from '../../middleware/validation.middleware';
 import { AppError, createNotFoundError } from '../../utils/app-error';
 import config from '../../config/env';
+import logger from '../../utils/logger';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { companyNotification, replyToVisitor, testEmail, visitorConfirmation } from '../../services/mail.templates';
 import { logMailFailure, mailConfigured, mailStatus, sendMail } from '../../services/mailer.service';
@@ -36,9 +37,11 @@ async function build(code: string, vars: Record<string, string>, fallback: () =>
 /** Emails the company and the visitor, then records the outcome on the enquiry. Runs in the background. */
 async function emailEnquiry(id: string, data: Record<string, any>): Promise<void> {
   let status: 'sent' | 'failed' | 'skipped';
+  let visitor: 'sent' | 'failed' | 'skipped' = 'skipped';
   let error = '';
   try {
     const to = await recipients();
+    logger.info(`[enquiry] ${id}: emailing the team at ${to.join(', ') || '(no recipient)'} and the visitor at ${data.email}`);
     if (!to.length) throw new Error('No recipient: set MAIL_TO or add an email under Contact details.');
     const mail = await build('ENQUIRY_NOTIFICATION', enquiryVars(data as any), () => companyNotification(data as any));
     if (mail) {
@@ -46,6 +49,7 @@ async function emailEnquiry(id: string, data: Record<string, any>): Promise<void
       status = 'sent';
     } else {
       status = 'skipped';
+      logger.warn(`[enquiry] ${id}: team notification skipped because the ENQUIRY_NOTIFICATION template is switched off in the CMS`);
     }
   } catch (e) {
     status = 'failed';
@@ -55,10 +59,17 @@ async function emailEnquiry(id: string, data: Record<string, any>): Promise<void
   // The visitor's confirmation is a courtesy: its failure never marks the enquiry as failed.
   try {
     const mail = await build('ENQUIRY_THANK_YOU', enquiryVars(data as any), () => visitorConfirmation(data as any));
-    if (mail) await sendMail({ to: data.email, subject: mail.subject, html: mail.html, text: mail.text });
+    if (mail) {
+      await sendMail({ to: data.email, subject: mail.subject, html: mail.html, text: mail.text });
+      visitor = 'sent';
+    } else {
+      logger.warn(`[enquiry] ${id}: visitor thank-you skipped because the ENQUIRY_THANK_YOU template is switched off in the CMS`);
+    }
   } catch (e) {
+    visitor = 'failed';
     logMailFailure('visitor confirmation', e);
   }
+  logger.info(`[enquiry] ${id}: email result: team=${status}${error ? ` (${error})` : ''}, visitor=${visitor}`);
   await Enquiry.updateOne({ _id: id }, { $set: { emailStatus: status, emailError: error } }).catch(() => undefined);
 }
 
@@ -94,6 +105,7 @@ class EnquiryRoutes implements Routes {
         const doc = await Enquiry.create(data);
         // Saved first, so an enquiry is never lost; the emails go out in the background.
         const emailQueued = mailConfigured();
+        logger.info(`[enquiry] saved ${String(doc._id)} from ${doc.email} (${(doc as any).source || 'contact form'}); emails ${emailQueued ? 'queued' : 'NOT queued: mail is not configured on the server'}`);
         if (emailQueued) void emailEnquiry(String(doc._id), doc.toObject());
         res.status(201).json({ data: { message: 'Enquiry received', emailQueued } });
       } catch (e) {
@@ -131,6 +143,7 @@ class EnquiryRoutes implements Routes {
       try {
         const to = await recipients();
         if (!to.length) throw new AppError(400, 'No recipient: set MAIL_TO or add an email under Contact details.', 'MAIL_NO_RECIPIENT');
+        logger.info(`[mail] test email requested for ${to.join(', ')}`);
         const mail = (await build('TEST_EMAIL', {}, testEmail, { ignoreActive: true }))!;
         try {
           await sendMail({ to, subject: mail.subject, html: mail.html, text: mail.text });
@@ -151,6 +164,7 @@ class EnquiryRoutes implements Routes {
         if (!mailConfigured()) throw new AppError(400, 'Email is not set up on the server, so replies cannot be sent yet. See the email notice at the top of this page.', 'MAIL_NOT_CONFIGURED');
 
         const user = (req as AuthenticatedRequest).user;
+        logger.info(`[reply] ${String(doc._id)}: ${(user as any)?.email ?? 'a CMS user'} is replying to ${doc.email}`);
         const sentBy = user?.name || user?.email || '';
         const mail = (await build('ENQUIRY_REPLY', enquiryVars(doc.toObject() as any, { reply: req.body.message, sentBy: sentBy || 'Aditya & Co.' }), () => replyToVisitor(doc.toObject() as any, req.body.message, sentBy), { ignoreActive: true }))!;
         try {
