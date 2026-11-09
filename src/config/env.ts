@@ -20,6 +20,9 @@ if (process.env.NODE_ENV === 'production' && (process.env.JWT_SECRET as string).
   throw new Error('JWT_SECRET must be at least 32 characters in production');
 }
 
+/** Env values are often pasted with stray spaces, newlines or quotes; any of them breaks an API key or address. */
+const clean = (v?: string): string => (v || '').trim().replace(/^["']|["']$/g, '').trim();
+
 const config = {
   port: parseInt(process.env.PORT || '5000', 10),
   mongodbUri: rawMongoUri,
@@ -40,7 +43,7 @@ const config = {
   },
   // Email for enquiries (Nodemailer). See services/mailer.service.ts for the Render free-plan notes.
   mail: {
-    brevoApiKey: process.env.BREVO_API_KEY || '',
+    brevoApiKey: clean(process.env.BREVO_API_KEY),
     smtp: {
       /** A Nodemailer "well-known service" such as gmail, as a shortcut for host, port and TLS */
       service: process.env.SMTP_SERVICE || '',
@@ -51,8 +54,9 @@ const config = {
       user: process.env.SMTP_USER || '',
       pass: process.env.SMTP_PASS || '',
     },
-    from: process.env.MAIL_FROM || '',
-    to: (process.env.MAIL_TO || '').split(',').map((s) => s.trim()).filter(Boolean),
+    // Same names as the Sorin backend accepts: EMAIL_FROM (preferred), SMTP_FROM or MAIL_FROM
+    from: clean(process.env.MAIL_FROM || process.env.EMAIL_FROM || process.env.SMTP_FROM),
+    to: clean(process.env.MAIL_TO || process.env.CONTACT_EMAIL).split(',').map((s) => s.trim()).filter(Boolean),
   },
   // The production website whose analytics the CMS shows by default.
   analytics: {

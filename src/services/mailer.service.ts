@@ -1,4 +1,4 @@
-import nodemailer, { Transporter, Transport } from 'nodemailer';
+import nodemailer, { Transporter } from 'nodemailer';
 import config from '../config/env';
 import logger from '../utils/logger';
 
@@ -41,7 +41,7 @@ export function mailProblems(): string[] {
   const mode = mailMode();
   if (mode === 'none') problems.push('No mail server is set. Add SMTP_HOST (or SMTP_SERVICE=gmail), SMTP_USER and SMTP_PASS to the backend environment.');
   if (mode === 'smtp' && config.mail.smtp.user && !config.mail.smtp.pass) problems.push('SMTP_PASS is not set. For Gmail use an App Password (Google Account > Security > 2-Step Verification > App passwords).');
-  if (mode !== 'none' && !senderAddress()) problems.push('MAIL_FROM is not set. Use an address your provider has verified, for example "Aditya & Co. <no-reply@yourdomain.com>".');
+  if (mode !== 'none' && !senderAddress()) problems.push('MAIL_FROM (or EMAIL_FROM) is not set. Use an address your provider has verified, for example "Aditya & Co. <no-reply@yourdomain.com>".');
   if (mode === 'smtp' && process.env.RENDER && RENDER_BLOCKED_PORTS.includes(smtpPort())) {
     problems.push(`SMTP port ${smtpPort()} is blocked on Render's free plan. Upgrade the Render plan, use a mail server that listens on another port (for example 2525), or set BREVO_API_KEY to send over HTTPS instead.`);
   }
@@ -60,6 +60,7 @@ export function mailStatus() {
     from: config.mail.from || config.mail.smtp.user || '',
     to: config.mail.to,
     problems: mailProblems(),
+    lastSend,
   };
 }
 
@@ -93,61 +94,98 @@ function senderAddress(): Addr | null {
 
 /* ---------------------------------------------------------------- transports */
 
-/** A Nodemailer transport that sends through Brevo's HTTPS API, so it works where SMTP ports are blocked. */
-function brevoApiTransport(apiKey: string): Transport {
-  return {
-    name: 'brevo-https',
-    version: '1.0.0',
-    send(mail, callback) {
-      const data = mail.data as Record<string, unknown>;
-      const sender = parseAddrs(data.from)[0];
-      const to = parseAddrs(data.to);
-      const replyTo = parseAddrs(data.replyTo)[0];
-      fetch('https://api.brevo.com/v3/smtp/email', {
+/** What happened on the last send, shown in the CMS and logged, so "no email arrived" can be diagnosed. */
+export interface LastSend {
+  at: string;
+  ok: boolean;
+  to: string;
+  messageId?: string;
+  error?: string;
+}
+let lastSend: LastSend | null = null;
+const record = (r: Omit<LastSend, 'at'>) => {
+  lastSend = { at: new Date().toISOString(), ...r };
+};
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Sends through Brevo's HTTP API directly (the same call the Sorin backend makes), with retries on
+ * network errors, 429 and 5xx. Throws a readable error when Brevo refuses the message.
+ */
+async function sendViaBrevo(opts: MailOptions): Promise<string | undefined> {
+  const sender = senderAddress()!;
+  const to = parseAddrs(opts.to);
+  const replyTo = parseAddrs(opts.replyTo)[0];
+  const body = JSON.stringify({
+    sender: { email: sender.email, ...(sender.name ? { name: sender.name } : {}) },
+    to: to.map((a) => ({ email: a.email, ...(a.name ? { name: a.name } : {}) })),
+    ...(replyTo ? { replyTo: { email: replyTo.email, ...(replyTo.name ? { name: replyTo.name } : {}) } } : {}),
+    subject: opts.subject,
+    htmlContent: opts.html,
+    textContent: opts.text,
+  });
+
+  let lastError = 'Unknown error';
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
-        headers: { 'api-key': apiKey, 'content-type': 'application/json', accept: 'application/json' },
-        body: JSON.stringify({
-          sender: sender && { name: sender.name, email: sender.email },
-          to: to.map((a) => ({ name: a.name, email: a.email })),
-          ...(replyTo ? { replyTo: { name: replyTo.name, email: replyTo.email } } : {}),
-          subject: data.subject,
-          htmlContent: data.html,
-          textContent: data.text,
-        }),
+        headers: { 'api-key': config.mail.brevoApiKey, 'content-type': 'application/json', accept: 'application/json' },
+        body,
         signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
-      })
-        .then(async (res) => {
-          const body = (await res.json().catch(() => ({}))) as { messageId?: string; message?: string };
-          if (!res.ok) throw new Error(`Brevo API ${res.status}: ${body.message ?? res.statusText}`);
-          callback(null, { messageId: body.messageId ?? '', envelope: { from: sender?.email, to: to.map((a) => a.email) }, accepted: to.map((a) => a.email), rejected: [], pending: [], response: 'queued' } as never);
-        })
-        .catch((err: Error) => callback(err, undefined as never));
-    },
-  };
+      });
+      const data = (await res.json().catch(() => ({}))) as { messageId?: string; message?: string; code?: string };
+      if (res.ok) return data.messageId;
+      lastError = `Brevo API ${res.status}: ${data.message ?? res.statusText}`;
+      if (!(res.status === 429 || res.status >= 500)) break; // 4xx cannot be fixed by retrying
+    } catch (err) {
+      lastError = `Could not reach Brevo: ${(err as Error).message}`;
+    }
+    if (attempt < 3) await sleep(500 * 2 ** (attempt - 1));
+  }
+  throw new Error(lastError);
 }
 
 let transporter: Transporter | null = null;
 function getTransporter(): Transporter {
   if (transporter) return transporter;
-  const { smtp, brevoApiKey } = config.mail;
-  transporter =
-    mailMode() === 'brevo-api'
-      ? nodemailer.createTransport(brevoApiTransport(brevoApiKey))
-      : nodemailer.createTransport({
-          // a well-known service (gmail ...) supplies host, port and TLS itself
-          ...(smtp.host ? { host: smtp.host, port: smtp.port, secure: smtp.secure } : { service: smtp.service }),
-          auth: smtp.user ? { user: smtp.user, pass: smtp.pass } : undefined,
-          // fail fast instead of hanging a request when the network blocks SMTP
-          connectionTimeout: 10_000,
-          greetingTimeout: 10_000,
-          socketTimeout: 20_000,
-        });
+  const { smtp } = config.mail;
+  transporter = nodemailer.createTransport({
+    // a well-known service (gmail ...) supplies host, port and TLS itself
+    ...(smtp.host ? { host: smtp.host, port: smtp.port, secure: smtp.secure } : { service: smtp.service }),
+    auth: smtp.user ? { user: smtp.user, pass: smtp.pass } : undefined,
+    // fail fast instead of hanging a request when the network blocks SMTP
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
+  });
   return transporter;
 }
 
 /** Sends one email. Rejects with a readable error when the provider refuses or the network blocks it. */
 export async function sendMail(opts: MailOptions): Promise<void> {
-  if (!mailConfigured()) throw new Error('Email is not configured on the server.');
+  const toLabel = parseAddrs(opts.to).map((a) => a.email).join(', ');
+  if (!mailConfigured()) {
+    const error = 'Email is not configured on the server.';
+    record({ ok: false, to: toLabel, error });
+    logger.warn(`[mail] NOT SENT to ${toLabel}: ${error} ${mailProblems().join(' ')}`);
+    throw new Error(error);
+  }
+
+  if (mailMode() === 'brevo-api') {
+    try {
+      const messageId = await sendViaBrevo(opts);
+      record({ ok: true, to: toLabel, messageId });
+      logger.info(`[mail] Brevo accepted "${opts.subject}" for ${toLabel} (messageId ${messageId ?? 'n/a'})`);
+      return;
+    } catch (e) {
+      record({ ok: false, to: toLabel, error: (e as Error).message });
+      logger.error(`[mail] Brevo REFUSED "${opts.subject}" for ${toLabel}: ${(e as Error).message}`);
+      throw e;
+    }
+  }
+
   const from = senderAddress()!;
   const failure = await getTransporter()
     .sendMail({
@@ -160,9 +198,22 @@ export async function sendMail(opts: MailOptions): Promise<void> {
     })
     .then(() => null, (e: unknown) => e as NodeJS.ErrnoException);
   if (failure) {
-    const blocked = mailMode() === 'smtp' && ['ETIMEDOUT', 'ECONNREFUSED', 'ESOCKET', 'ENETUNREACH'].includes(String(failure.code));
-    throw new Error(`${failure.message}${blocked ? ' The network may be blocking outbound SMTP (the Render free plan does). See the README for options.' : ''}`);
+    const blocked = ['ETIMEDOUT', 'ECONNREFUSED', 'ESOCKET', 'ENETUNREACH'].includes(String(failure.code));
+    const error = `${failure.message}${blocked ? ' The network may be blocking outbound SMTP (the Render free plan does). See the README for options.' : ''}`;
+    record({ ok: false, to: toLabel, error });
+    logger.error(`[mail] SMTP failed for ${toLabel}: ${error}`);
+    throw new Error(error);
   }
+  record({ ok: true, to: toLabel });
+  logger.info(`[mail] SMTP accepted "${opts.subject}" for ${toLabel}`);
+}
+
+/** One line at startup so the Render logs show how mail is configured (never the secret itself). */
+export function logMailConfig(): void {
+  const mode = mailMode();
+  const key = config.mail.brevoApiKey;
+  logger.info(`[mail] mode=${mode} from="${config.mail.from || '(not set)'}" to=${config.mail.to.join(',') || '(CMS Contact details)'} apiKey=${key ? `set (${key.length} chars, starts ${key.slice(0, 6)}...)` : 'NOT SET'}`);
+  mailProblems().forEach((p) => logger.warn(`[mail] ${p}`));
 }
 
 /** Fire-and-forget wrapper used by request handlers: never throws, logs failures. */

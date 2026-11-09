@@ -128,5 +128,9 @@ API (admin, JWT): `GET /api/admin/email-templates`, `GET|PATCH /api/admin/email-
 
 1. In Brevo, verify your phone, then **SMTP & API -> API Keys** and generate a key.
 2. **Senders, Domains & Dedicated IPs**: add and verify a sender, and authenticate your domain (DKIM/DMARC records) for good deliverability.
-3. Set `BREVO_API_KEY` and `MAIL_FROM` (for example `Aditya & Co. <info@adityaco.co.in>`), plus `MAIL_TO` if enquiries should go to a specific inbox, then redeploy.
+3. Set `BREVO_API_KEY` and `MAIL_FROM` (`EMAIL_FROM` also works) (for example `Aditya & Co. <info@adityaco.co.in>`), plus `MAIL_TO` if enquiries should go to a specific inbox, then redeploy.
 4. In the CMS open **Email templates**, enter your address and press **Send test**.
+
+### If no email arrives
+
+On startup the backend logs one `[mail] mode=... from=... apiKey=...` line, and every send logs `[mail] Brevo accepted ... (messageId ...)` or `[mail] Brevo REFUSED ... <reason>`. Check the Render logs for these first. The CMS Enquiries mail status also shows the last send result. A message Brevo accepted appears under Brevo -> Transactional -> Logs; if it is not there, Brevo never received it.
