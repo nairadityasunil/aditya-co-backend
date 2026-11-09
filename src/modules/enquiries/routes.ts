@@ -11,6 +11,7 @@ import { AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { companyNotification, replyToVisitor, testEmail, visitorConfirmation } from '../../services/mail.templates';
 import { logMailFailure, mailConfigured, mailStatus, sendMail } from '../../services/mailer.service';
 import { enquiryVars, renderMail, RenderedMail } from '../emailTemplates/service';
+import { diagnoseBrevo } from '../../services/brevo.diagnostics';
 import SiteSettings from '../settings/model';
 import Enquiry from './model';
 
@@ -134,6 +135,15 @@ class EnquiryRoutes implements Routes {
     this.router.get(`${this.path}/admin/mail/status`, ...guard, async (_req: Request, res: Response, next: NextFunction) => {
       try {
         res.status(200).json({ data: { ...mailStatus(), recipients: await recipients() } });
+      } catch (e) {
+        next(e);
+      }
+    });
+
+    // Which Brevo account does the key belong to, and are the sender and domain usable?
+    this.router.get(`${this.path}/admin/mail/diagnose`, ...guard, async (_req: Request, res: Response, next: NextFunction) => {
+      try {
+        res.status(200).json({ data: await diagnoseBrevo() });
       } catch (e) {
         next(e);
       }
