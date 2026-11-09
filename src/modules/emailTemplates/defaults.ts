@@ -128,11 +128,30 @@ export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
     ],
     html: wrap(
       'Hello {{firstName}}',
-      `          <div style="font-size:15px;line-height:1.7;white-space:pre-wrap;">{{reply}}</div>
-          <p style="margin:22px 0 0;font-size:15px;">Regards,<br><strong>{{sentBy}}</strong><br><span style="color:#64748b;">{{companyName}}</span></p>
-          <p style="margin:26px 0 6px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#64748b;">Your enquiry about {{service}}</p>
-          <div style="padding:14px;background:#f5f7fb;border-left:3px solid #cbd5e1;border-radius:8px;font-size:14px;line-height:1.6;color:#475569;white-space:pre-wrap;">{{message}}</div>
-          <p style="margin:18px 0 0;font-size:13px;color:#64748b;">Just reply to this email to continue the conversation.</p>`
+      `          <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#475569;">Thank you for getting in touch. Here is our reply to your enquiry about <strong style="color:#0a0f1c;">{{service}}</strong>.</p>
+
+          <div style="padding:20px 22px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;font-size:16px;line-height:1.75;color:#0a0f1c;white-space:pre-wrap;">{{reply}}</div>
+
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0 0;">
+            <tr>
+              <td style="width:4px;background:#f12024;border-radius:2px;">&nbsp;</td>
+              <td style="padding:2px 0 2px 14px;font-size:15px;line-height:1.6;color:#0a0f1c;">Regards,<br><strong>{{sentBy}}</strong><br><span style="color:#64748b;">{{companyName}}</span></td>
+            </tr>
+          </table>
+
+          <p style="margin:30px 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;">Your original enquiry</p>
+          <div style="padding:14px 16px;background:#ffffff;border:1px solid #e2e8f0;border-left:4px solid #cbd5e1;border-radius:0 10px 10px 0;font-size:14px;line-height:1.65;color:#475569;white-space:pre-wrap;">{{message}}</div>
+
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:28px 0 0;background:#fff7f7;border:1px solid #fde1e1;border-radius:12px;">
+            <tr><td style="padding:16px 20px;font-size:14px;line-height:1.7;color:#0a0f1c;">
+              <strong>Questions? We are happy to help.</strong><br>
+              Reply to this email, or write to us at
+              <a href="mailto:info@adityaco.co.in" style="color:#d91b22;text-decoration:none;font-weight:bold;">info@adityaco.co.in</a>
+              or
+              <a href="mailto:adityakdl@gmail.com" style="color:#d91b22;text-decoration:none;font-weight:bold;">adityakdl@gmail.com</a>.
+            </td></tr>
+          </table>`,
+      'Our reply to your enquiry about {{service}}'
     ),
   },
   {
