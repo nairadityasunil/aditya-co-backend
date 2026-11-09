@@ -32,3 +32,16 @@ Every collection supports `GET`, `POST`, `PATCH /:id`, `DELETE /:id` and `POST /
 Uploads: `POST /api/admin/upload/single` (multipart `file`).
 
 Cloudinary credentials come from the environment only.
+
+## Email (Brevo)
+
+Website enquiries are saved first, then two emails are sent through Brevo: a notification to the company inbox (reply-to is the sender) and a thank-you to the sender. The outcome is stored on the enquiry (`notified`, `acknowledged`, `mailError`) so failures show up in the CMS.
+
+Set up:
+
+1. Create a Brevo account, then **Senders, Domains & Dedicated IPs**: add and verify your domain (add the DKIM/DMARC DNS records Brevo shows) or at least a single sender address.
+2. **SMTP & API -> API Keys**: create an API key.
+3. Set `BREVO_API_KEY`, `EMAIL_FROM` (a verified sender), `EMAIL_FROM_NAME`, `CONTACT_EMAIL` (who receives enquiries) and `WEBSITE_URL`.
+4. Run `npm run seed` (creates the default templates) and send a test from **CMS -> Email templates**.
+
+Templates live in the `EmailTemplate` collection and are edited in the CMS (`/api/admin/email-templates`): subject and HTML use `{{variable}}` placeholders, values are HTML-escaped, the preview renders with sample data, and "Reset to default" restores the built-in version.

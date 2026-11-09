@@ -7,6 +7,10 @@ const enquirySchema = new Schema(
     phone: { type: String, default: '' },
     service: { type: String, default: '' },
     message: { type: String, required: true },
+    // Email outcome, so a failed send can be found and followed up in the CMS
+    notified: { type: Boolean, default: false },
+    acknowledged: { type: Boolean, default: false },
+    mailError: { type: String, default: '' },
     status: { type: String, enum: ['new', 'read', 'replied'], default: 'new', index: true },
   },
   { timestamps: true }

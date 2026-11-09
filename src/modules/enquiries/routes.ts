@@ -5,7 +5,35 @@ import { Routes } from '../../interfaces/routes.interface';
 import { requireAdmin, requireAuth } from '../../middleware/auth.middleware';
 import { validateBody } from '../../middleware/validation.middleware';
 import { createNotFoundError } from '../../utils/app-error';
+import config from '../../config/env';
+import logger from '../../utils/logger';
+import { sendTemplated } from '../emailTemplates/service';
 import Enquiry from './model';
+
+const formatIst = (d: Date) =>
+  d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+
+/** Sends the company notification and the sender's thank-you, then records what happened. */
+async function dispatchEnquiryEmails(enquiry: { _id: unknown; name: string; email: string; phone?: string | null; service?: string | null; message: string }) {
+  try {
+    const vars = {
+      name: enquiry.name,
+      email: enquiry.email,
+      phone: enquiry.phone || 'Not provided',
+      service: enquiry.service || 'General enquiry',
+      message: enquiry.message,
+      receivedAt: formatIst(new Date()),
+    };
+    const [notify, thanks] = await Promise.all([
+      sendTemplated('ENQUIRY_NOTIFICATION', config.email.contactEmails, vars, { replyTo: { email: enquiry.email, name: enquiry.name } }),
+      sendTemplated('ENQUIRY_THANK_YOU', enquiry.email, vars),
+    ]);
+    const errors = [notify.ok ? '' : `Notification: ${notify.error}`, thanks.ok ? '' : `Thank-you: ${thanks.error}`].filter(Boolean);
+    await Enquiry.updateOne({ _id: enquiry._id }, { $set: { notified: notify.ok, acknowledged: thanks.ok, mailError: errors.join(' | ') } });
+  } catch (err) {
+    logger.error(`Enquiry email dispatch failed: ${err instanceof Error ? err.message : err}`);
+  }
+}
 
 const submitLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -22,7 +50,7 @@ const submitSchema = Joi.object({
   service: Joi.string().trim().allow('').max(120),
   message: Joi.string().trim().min(5).max(3000).required(),
   // Honeypot: real users leave this empty
-  website: Joi.string().allow('').max(0),
+  website: Joi.string().allow(''),
 });
 
 class EnquiryRoutes implements Routes {
@@ -32,10 +60,19 @@ class EnquiryRoutes implements Routes {
   constructor() {
     const guard = [requireAuth, requireAdmin];
 
-    this.router.post(`${this.path}/public/enquiries`, submitLimiter, validateBody(submitSchema), async (req: Request, res: Response, next: NextFunction) => {
+    this.router.post(`${this.path}/public/enquiries`, submitLimiter, (req: Request, res: Response, next: NextFunction) => {
+      // Bots fill the hidden field: pretend it worked, store and send nothing
+      if (typeof req.body?.website === 'string' && req.body.website.trim() !== '') {
+        res.status(201).json({ data: { message: 'Enquiry received' } });
+        return;
+      }
+      next();
+    }, validateBody(submitSchema), async (req: Request, res: Response, next: NextFunction) => {
       try {
         const { website: _hp, ...data } = req.body;
-        await Enquiry.create(data);
+        const enquiry = await Enquiry.create(data);
+        // The enquiry is saved; respond now and send the emails in the background
+        void dispatchEnquiryEmails(enquiry);
         res.status(201).json({ data: { message: 'Enquiry received' } });
       } catch (e) {
         next(e);

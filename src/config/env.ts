@@ -38,6 +38,19 @@ const config = {
     apiSecret: process.env.CLOUDINARY_API_SECRET || '',
     folder: process.env.CLOUDINARY_FOLDER || 'aditya_co',
   },
+  // Brevo transactional email (https://app.brevo.com -> SMTP & API -> API keys)
+  email: {
+    brevoApiKey: (process.env.BREVO_API_KEY || '').trim(),
+    // Must be a sender (or on an authenticated domain) verified in Brevo
+    from: (process.env.EMAIL_FROM || '').trim(),
+    fromName: (process.env.EMAIL_FROM_NAME || 'Aditya & Co.').trim(),
+    // Where new website enquiries are delivered (comma separated for several inboxes)
+    contactEmails: (process.env.CONTACT_EMAIL || 'info@adityaco.co.in')
+      .split(',')
+      .map((e) => e.trim())
+      .filter(Boolean),
+    websiteUrl: (process.env.WEBSITE_URL || 'https://adityaco.co.in').replace(/\/$/, ''),
+  },
   seedAdmin: {
     username: process.env.ADMIN_USERNAME || 'admin',
     password: process.env.ADMIN_PASSWORD || 'admin',
