@@ -108,3 +108,25 @@ Gmail example: `SMTP_SERVICE=gmail`, `SMTP_USER=you@gmail.com`, `SMTP_PASS=<app 
 **Render's free plan blocks outbound SMTP on ports 25, 465 and 587**, so these logins time out there (it works locally and on a paid Render plan). On the free plan you can either use a mail server that listens on another port (many offer 2525, but Gmail does not), or switch on the optional HTTPS fallback by setting `BREVO_API_KEY` (a free Brevo account, same Nodemailer code, delivered over port 443). The CMS Enquiries page tells you if your current settings will hit this.
 
 Until email is configured the website keeps using EmailJS as before (the server tells the site whether it sent the email, so nobody gets duplicates).
+
+## Email templates (editable in the CMS)
+
+The emails the site sends automatically are stored in the `EmailTemplate` collection and edited in the CMS under **Email templates**:
+
+| Code | When it is sent |
+|---|---|
+| `ENQUIRY_NOTIFICATION` | To the company when a contact form or chatbot enquiry arrives |
+| `ENQUIRY_THANK_YOU` | To the visitor right after they send an enquiry |
+| `ENQUIRY_REPLY` | Wraps a reply written in the CMS under Enquiries |
+| `TEST_EMAIL` | The "Send test email" button |
+
+Subject and HTML use `{{variable}}` placeholders (each template lists its variables). Values are HTML-escaped and the subject can never contain a line break. The CMS has a live preview with sample data, "Send test" and "Reset to default". Defaults are inserted on first use or by `npm run seed` and are never overwritten afterwards. Switching a template off stops that automatic email; replies and tests always send. If the database cannot be read, the built-in wording in `services/mail.templates.ts` is used so no enquiry email is lost.
+
+API (admin, JWT): `GET /api/admin/email-templates`, `GET|PATCH /api/admin/email-templates/:code`, `POST /api/admin/email-templates/:code/{preview,test,reset}`.
+
+### Brevo quick setup
+
+1. In Brevo, verify your phone, then **SMTP & API -> API Keys** and generate a key.
+2. **Senders, Domains & Dedicated IPs**: add and verify a sender, and authenticate your domain (DKIM/DMARC records) for good deliverability.
+3. Set `BREVO_API_KEY` and `MAIL_FROM` (for example `Aditya & Co. <info@adityaco.co.in>`), plus `MAIL_TO` if enquiries should go to a specific inbox, then redeploy.
+4. In the CMS open **Email templates**, enter your address and press **Send test**.

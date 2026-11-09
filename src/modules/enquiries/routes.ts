@@ -9,6 +9,7 @@ import config from '../../config/env';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { companyNotification, replyToVisitor, testEmail, visitorConfirmation } from '../../services/mail.templates';
 import { logMailFailure, mailConfigured, mailStatus, sendMail } from '../../services/mailer.service';
+import { enquiryVars, renderMail, RenderedMail } from '../emailTemplates/service';
 import SiteSettings from '../settings/model';
 import Enquiry from './model';
 
@@ -19,16 +20,33 @@ async function recipients(): Promise<string[]> {
   return settings?.emails ?? [];
 }
 
+/**
+ * Builds a mail from its CMS-editable template. Returns null when the template is switched off.
+ * If the database is unreachable the built-in wording is used, so an enquiry email is never lost to that.
+ */
+async function build(code: string, vars: Record<string, string>, fallback: () => RenderedMail, opts: { ignoreActive?: boolean } = {}): Promise<RenderedMail | null> {
+  try {
+    return await renderMail(code, vars, opts);
+  } catch (e) {
+    logMailFailure(`template ${code}`, e);
+    return fallback();
+  }
+}
+
 /** Emails the company and the visitor, then records the outcome on the enquiry. Runs in the background. */
 async function emailEnquiry(id: string, data: Record<string, any>): Promise<void> {
-  let status: 'sent' | 'failed';
+  let status: 'sent' | 'failed' | 'skipped';
   let error = '';
   try {
     const to = await recipients();
     if (!to.length) throw new Error('No recipient: set MAIL_TO or add an email under Contact details.');
-    const mail = companyNotification(data as any);
-    await sendMail({ to, subject: mail.subject, html: mail.html, text: mail.text, replyTo: data.email });
-    status = 'sent';
+    const mail = await build('ENQUIRY_NOTIFICATION', enquiryVars(data as any), () => companyNotification(data as any));
+    if (mail) {
+      await sendMail({ to, subject: mail.subject, html: mail.html, text: mail.text, replyTo: data.email });
+      status = 'sent';
+    } else {
+      status = 'skipped';
+    }
   } catch (e) {
     status = 'failed';
     error = (e as Error).message.slice(0, 300);
@@ -36,8 +54,8 @@ async function emailEnquiry(id: string, data: Record<string, any>): Promise<void
   }
   // The visitor's confirmation is a courtesy: its failure never marks the enquiry as failed.
   try {
-    const mail = visitorConfirmation(data as any);
-    await sendMail({ to: data.email, subject: mail.subject, html: mail.html, text: mail.text });
+    const mail = await build('ENQUIRY_THANK_YOU', enquiryVars(data as any), () => visitorConfirmation(data as any));
+    if (mail) await sendMail({ to: data.email, subject: mail.subject, html: mail.html, text: mail.text });
   } catch (e) {
     logMailFailure('visitor confirmation', e);
   }
@@ -113,7 +131,7 @@ class EnquiryRoutes implements Routes {
       try {
         const to = await recipients();
         if (!to.length) throw new AppError(400, 'No recipient: set MAIL_TO or add an email under Contact details.', 'MAIL_NO_RECIPIENT');
-        const mail = testEmail();
+        const mail = (await build('TEST_EMAIL', {}, testEmail, { ignoreActive: true }))!;
         try {
           await sendMail({ to, subject: mail.subject, html: mail.html, text: mail.text });
         } catch (e) {
@@ -134,7 +152,7 @@ class EnquiryRoutes implements Routes {
 
         const user = (req as AuthenticatedRequest).user;
         const sentBy = user?.name || user?.email || '';
-        const mail = replyToVisitor(doc.toObject() as any, req.body.message, sentBy);
+        const mail = (await build('ENQUIRY_REPLY', enquiryVars(doc.toObject() as any, { reply: req.body.message, sentBy: sentBy || 'Aditya & Co.' }), () => replyToVisitor(doc.toObject() as any, req.body.message, sentBy), { ignoreActive: true }))!;
         try {
           // The visitor's answer goes to the firm's own inbox.
           await sendMail({ to: doc.email, subject: mail.subject, html: mail.html, text: mail.text, replyTo: (await recipients())[0] });

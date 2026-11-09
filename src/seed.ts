@@ -6,6 +6,7 @@ import connectDB from './config/db';
 import config from './config/env';
 import AdminUser from './modules/auth/model';
 import SiteSettings from './modules/settings/model';
+import { ensureDefaultTemplates } from './modules/emailTemplates/service';
 import { Achievement, SoftwareService, Stat, TeamMember } from './modules/content/models';
 
 /**
@@ -108,6 +109,9 @@ async function seed() {
       },
     ]);
   }
+
+  await ensureDefaultTemplates();
+  console.log('Email templates ensured.');
 
   console.log('Seed complete.');
   await mongoose.disconnect();
