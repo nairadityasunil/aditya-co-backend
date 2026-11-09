@@ -56,6 +56,9 @@ const config = {
     },
     // Same names as the Sorin backend accepts: EMAIL_FROM (preferred), SMTP_FROM or MAIL_FROM
     from: clean(process.env.MAIL_FROM || process.env.EMAIL_FROM || process.env.SMTP_FROM),
+    // Optional public address for the Reply-To of emails sent TO VISITORS (thank-you, CMS replies). Empty means
+    // replies go to the From address, so a team member's personal inbox is never exposed in a visitor's email.
+    replyTo: clean(process.env.MAIL_REPLY_TO),
     to: clean(process.env.MAIL_TO || process.env.CONTACT_EMAIL).split(',').map((s) => s.trim()).filter(Boolean),
   },
   // The production website whose analytics the CMS shows by default.
