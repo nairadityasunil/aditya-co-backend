@@ -1,6 +1,7 @@
 import nodemailer, { Transporter } from 'nodemailer';
 import config from '../config/env';
 import logger from '../utils/logger';
+import { logBrevoDiagnosis, trackDelivery } from './brevo.diagnostics';
 
 /**
  * Email for enquiries, built on Nodemailer.
@@ -178,6 +179,7 @@ export async function sendMail(opts: MailOptions): Promise<void> {
       const messageId = await sendViaBrevo(opts);
       record({ ok: true, to: toLabel, messageId });
       logger.info(`[mail] Brevo accepted "${opts.subject}" for ${toLabel} (messageId ${messageId ?? 'n/a'})`);
+      trackDelivery(messageId, toLabel);
       return;
     } catch (e) {
       record({ ok: false, to: toLabel, error: (e as Error).message });
@@ -214,6 +216,8 @@ export function logMailConfig(): void {
   const key = config.mail.brevoApiKey;
   logger.info(`[mail] mode=${mode} from="${config.mail.from || '(not set)'}" to=${config.mail.to.join(',') || '(CMS Contact details)'} apiKey=${key ? `set (${key.length} chars, starts ${key.slice(0, 6)}...)` : 'NOT SET'}`);
   mailProblems().forEach((p) => logger.warn(`[mail] ${p}`));
+  // Ask Brevo which account this key belongs to and whether the sender/domain are usable (non-blocking)
+  if (mode === 'brevo-api') void logBrevoDiagnosis().catch((e) => logger.warn(`[mail] Brevo diagnosis failed: ${(e as Error).message}`));
 }
 
 /** Fire-and-forget wrapper used by request handlers: never throws, logs failures. */
