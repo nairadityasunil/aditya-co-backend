@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import Joi from 'joi';
-import rateLimit from 'express-rate-limit';
+import { enquiryAttemptLimiter, enquiryBurstLimiter, enquiryEmailLimiter, enquiryHourlyLimiter } from '../../middleware/rateLimiters';
 import { Routes } from '../../interfaces/routes.interface';
 import { requireAdmin, requireAuth } from '../../middleware/auth.middleware';
 import { validateBody } from '../../middleware/validation.middleware';
@@ -74,14 +74,6 @@ async function emailEnquiry(id: string, data: Record<string, any>): Promise<void
   await Enquiry.updateOne({ _id: id }, { $set: { emailStatus: status, emailError: error } }).catch(() => undefined);
 }
 
-const submitLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: { error: 'Too many enquiries, please try again later', code: 'RATE_LIMITED' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
 const submitSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required(),
   email: Joi.string().trim().email().required(),
@@ -100,7 +92,7 @@ class EnquiryRoutes implements Routes {
   constructor() {
     const guard = [requireAuth, requireAdmin];
 
-    this.router.post(`${this.path}/public/enquiries`, submitLimiter, validateBody(submitSchema), async (req: Request, res: Response, next: NextFunction) => {
+    this.router.post(`${this.path}/public/enquiries`, enquiryAttemptLimiter, validateBody(submitSchema), enquiryBurstLimiter, enquiryHourlyLimiter, enquiryEmailLimiter, async (req: Request, res: Response, next: NextFunction) => {
       try {
         const { website: _hp, ...data } = req.body;
         const doc = await Enquiry.create(data);
