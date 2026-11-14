@@ -138,3 +138,16 @@ On startup the backend logs one `[mail] mode=... from=... apiKey=...` line, and 
 ### Reply-To on emails sent to visitors
 
 Emails to visitors (the thank-you and replies written in the CMS) carry no Reply-To by default, so a reply goes to the From address (for example `info@adityaco.co.in`) and no team member's personal address appears in the visitor's email. To route replies somewhere else, set `MAIL_REPLY_TO` to a public company address. The team notification still replies to the visitor, because that is what lets the team answer them.
+
+### Rate limits on the enquiry form and chatbot
+
+Applied per visitor in this order (`src/middleware/rateLimiters.ts`). A blocked visitor gets a 429 whose message says how long to wait (and `retryAfterSeconds`).
+
+| Limit | Allowance | Counts |
+|---|---|---|
+| Attempts | 30 per 5 minutes per IP | every request, valid or not |
+| Burst | 5 enquiries per 5 minutes per IP | successful enquiries only |
+| Hourly | 15 enquiries per hour per IP | successful enquiries only |
+| Per email address | 3 per 10 minutes | successful enquiries only, stops the thank-you email being used to flood an inbox |
+
+Mistyped or invalid submissions never use up a visitor's allowance. The counters are in memory, so a redeploy or restart clears them.
